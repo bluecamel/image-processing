@@ -1,8 +1,10 @@
 #pragma once
 
+#include <sstream>
+#include <atomic>
+
 #include "airmap/panorama.h"
 #include "airmap/logger.h"
-#include <sstream>
 
 namespace airmap {
 namespace stitcher {
@@ -76,6 +78,9 @@ public:
             try {
                 return _underlying->stitch();
             } catch (const RetriableError &e) {
+                if (_retries == 0) {
+                    throw;
+                }
                 std::stringstream ss;
                 ss << "Stitching failed with " << e.what() << ", retrying, retries left " << _retries - i;
                 _logger->log(Logger::Severity::error, ss.str().c_str(), "stitcher");
@@ -83,11 +88,14 @@ public:
         }
         return _underlying->stitch();
     }
-    void cancel() override {_underlying->cancel(); }
+    void cancel() override {
+        _retries = 0;
+        _underlying->cancel();
+    }
 
 private:
     Stitcher::SharedPtr _underlying;
-    size_t _retries;
+    std::atomic<size_t> _retries;
     std::shared_ptr<Logger> _logger;
 };
 
