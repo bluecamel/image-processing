@@ -43,6 +43,31 @@ std::string path::stem() const
 
 namespace stitcher {
 
+float geocoordinate_t::distance_metres(const geocoordinate_t &to) const
+{
+    geocoordinate_t from_rad { deg2Rad * lng(), deg2Rad * lat() };
+    geocoordinate_t to_rad { deg2Rad * to.lng(), deg2Rad * to.lat() };
+
+    // Haversine Formula
+    long double dlong = from_rad.lng() - to_rad.lng();
+    long double dlat = from_rad.lat() - to_rad.lat();
+
+    long double ans = pow(sin(dlat / 2), 2)
+            + cos(from_rad.lat()) * cos(to_rad.lat()) * pow(sin(dlong / 2), 2);
+
+    ans = 2 * asin(sqrt(ans));
+
+    // Radius of Earth in
+    // Kilometers, R = 6371
+    // Use R = 3956 for miles
+    long double R = 6371000;
+
+    // Calculate the result
+    ans = ans * R;
+
+    return ans;
+}
+
 size_t Panorama::Parameters::defaultMemoryBudgetMB()
 {
     size_t deviceMemoryMB = 4000ul; // default
@@ -88,11 +113,11 @@ GeoImage GeoImage::fromExif(const std::string &imagePath)
     // parse image EXIF and XMP metadata
     TinyEXIF::EXIFInfo imageEXIF(data.data(), length);
     if (!imageEXIF.Fields) {
-        throw std::invalid_argument("Can't extract exif metadata from " + imagePath);
+        throw std::invalid_argument("Can't extract exif metadata from" + imagePath);
     }
     struct stat fileInfo;
     if (stat(imagePath.c_str(), &fileInfo) != 0) { // Use stat( ) to get the info
-        throw std::invalid_argument("Can't extract exif metadata from " + imagePath);
+        throw std::invalid_argument("Can't extract exif metadata from" + imagePath);
     }
     time_t file_created = fileInfo.st_mtime;
     assert(file_created > 0);
@@ -101,8 +126,8 @@ GeoImage GeoImage::fromExif(const std::string &imagePath)
     strptime(imageEXIF.DateTime.c_str(), "%Y:%m:%d %H:%M:%S", &image_created);
 
     return GeoImage { imagePath,
-                      geocoordinate_t(imageEXIF.GeoLocation.Latitude,
-                                      imageEXIF.GeoLocation.Longitude),
+                      geocoordinate_t(imageEXIF.GeoLocation.Longitude,
+                                      imageEXIF.GeoLocation.Latitude),
                       imageEXIF.GeoLocation.PitchDegree,
                       imageEXIF.GeoLocation.YawDegree,
                       std::max(static_cast<time_t>(0), std::mktime(&image_created)),

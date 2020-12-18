@@ -69,30 +69,7 @@ public:
     inline double lng() const { return std::get<0>(*this); }
     inline double lat() const { return std::get<1>(*this); }
 
-    float distance_metres(const geocoordinate_t &to) const
-    {
-        geocoordinate_t from_rad { deg2Rad * lng(), deg2Rad * lat() };
-        geocoordinate_t to_rad { deg2Rad * to.lng(), deg2Rad * to.lat() };
-
-        // Haversine Formula
-        long double dlong = from_rad.lng() - to_rad.lng();
-        long double dlat = from_rad.lat() - to_rad.lat();
-
-        long double ans = pow(sin(dlat / 2), 2)
-                + cos(from_rad.lat()) * cos(to_rad.lat()) * pow(sin(dlong / 2), 2);
-
-        ans = 2 * asin(sqrt(ans));
-
-        // Radius of Earth in
-        // Kilometers, R = 6371
-        // Use R = 3956 for miles
-        long double R = 6371000;
-
-        // Calculate the result
-        ans = ans * R;
-
-        return ans;
-    }
+    float distance_metres(const geocoordinate_t &to) const;
 };
 
 class geo_bounding_box_t : protected std::pair<geocoordinate_t, geocoordinate_t>
