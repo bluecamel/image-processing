@@ -68,7 +68,7 @@ Stitcher::Report OpenCVStitcher::stitch()
         imgs.push_back(img);
     }
 
-    report.inputScaled =
+    double maxInputImageScale =
             std::min(1.0,
                      (1.0 * _panorama.inputPaths().size() * _parameters.maxInputImageSize)
                              / totalNoOfInputPixels);
@@ -80,10 +80,10 @@ Stitcher::Report OpenCVStitcher::stitch()
     // parameters.memoryBudgetMB we'll stand no chance of succeeding and so we have no
     // choice, but to scale the input. We've empirically established and will continue
     // to calibrate the value of:
-    static constexpr double inputBudgetMultiplier = 4.5;
-    report.inputScaled = std::min(report.inputScaled,
-                                  _parameters.memoryBudgetMB
-                                          / (inputBudgetMultiplier * report.inputSizeMB));
+    static constexpr double inputBudgetMultiplier = 5;
+    double maxRAMBudgetScale = _parameters.memoryBudgetMB
+                                          / (inputBudgetMultiplier * report.inputSizeMB);
+    report.inputScaled = std::min(maxRAMBudgetScale, maxInputImageScale);
 
     if (report.inputScaled < 1.0) {
         if (report.inputScaled < 0.2) {
@@ -105,13 +105,15 @@ Stitcher::Report OpenCVStitcher::stitch()
         for (auto &img : imgs) {
             cv::resize(img, img, { 0, 0 }, report.inputScaled, report.inputScaled);
         }
+        LOG(info) << "Scaled" << report.inputSizeMB << "MB of input to"
+                  << report.inputSizeMB * report.inputScaled << "MB (by "
+                  << report.inputScaled << "), the lesser of:";
+        LOG(info) << "- " << maxRAMBudgetScale << "to fit the given RAM budget of"
+                  << _parameters.memoryBudgetMB << "MB and";
         size_t maxInputImgWidth = std::sqrt(4 * _parameters.maxInputImageSize / 3);
         size_t maxInputImgHeight = 3 * maxInputImgWidth / 4;
-        LOG(info) << "Scaled " << report.inputSizeMB << "MB of input to "
-                  << report.inputSizeMB * report.inputScaled << "MB ("
-                  << report.inputScaled << ") to fit the given RAM budget of "
-                  << _parameters.memoryBudgetMB << "MB and max input image size of "
-                  << maxInputImgWidth << "x" << maxInputImgHeight << std::endl;
+        LOG(info) << "- " << maxInputImageScale << "max input image size of"
+                  << maxInputImgWidth << "x" << maxInputImgHeight;
     }
 
     cv::Mat result;
