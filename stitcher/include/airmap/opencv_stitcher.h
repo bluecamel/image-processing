@@ -1,5 +1,9 @@
 #pragma once
 
+#include <boost/format.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/optional.hpp>
+
 #include <opencv2/core/utility.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -16,11 +20,17 @@
 #include <opencv2/stitching/detail/warpers.hpp>
 #include <opencv2/stitching/warpers.hpp>
 
+#include "camera.h"
+#include "camera_models.h"
+#include "gimbal.h"
+#include "images.h"
+#include "logger.h"
 #include "stitcher.h"
+
+using boost::filesystem::path;
 
 namespace airmap {
 namespace stitcher {
-
 
 /**
  * @brief The OpenCVStitcher performs basic, same callstack stitching using OpenCV
@@ -123,6 +133,12 @@ public:
 
         //! Megapixels an image will be scaled down to for the composition step.
         double compose_megapix;
+
+        //! Whether to create debug artifacts (e.g. feature detection, matching, warping, etc.)
+        bool debug;
+
+        //! Path to debug artifacts directory.
+        path debug_path;
 
         /*!
          * The type of estimator (e.g. affine or homography) to use to estimate initial
@@ -233,7 +249,7 @@ public:
          * defaults in the future.
          * @param stitchType The stitching default to use.
          */
-        Configuration(StitchType stitchType)
+        Configuration(StitchType stitchType, bool _debug = false, path _debugPath = path("debug"))
         {
             switch (stitchType) {
             case StitchType::ThreeSixty:
@@ -261,6 +277,9 @@ public:
                 work_megapix = 0.6;
                 break;
             }
+
+            debug = _debug;
+            debug_path = _debugPath;
         }
 
         /**
@@ -270,6 +289,8 @@ public:
          * @param blender_type
          * @param bundle_adjuster_type
          * @param compose_megapix
+         * @param debug
+         * @param debug_path
          * @param estimator_type
          * @param exposure_compensator_type
          * @param exposure_compensation_nr_feeds
@@ -291,6 +312,7 @@ public:
          */
         Configuration(float blend_strength, int blender_type,
                       BundleAdjusterType bundle_adjuster_type, double compose_megapix,
+                      bool debug, path debug_path,
                       EstimatorType estimator_type,
                       ExposureCompensatorType exposure_compensator_type,
                       int exposure_compensation_nr_feeds,
@@ -306,6 +328,8 @@ public:
             , blender_type(blender_type)
             , bundle_adjuster_type(bundle_adjuster_type)
             , compose_megapix(compose_megapix)
+            , debug(debug)
+            , debug_path(debug_path)
             , estimator_type(estimator_type)
             , exposure_compensator_type(exposure_compensator_type)
             , exposure_compensation_nr_feeds(exposure_compensation_nr_feeds)
@@ -326,83 +350,6 @@ public:
             , work_megapix(work_megapix)
         {
         }
-    };
-
-    /**
-     * @brief SourceImages
-     * A struct to contain and manage source images.
-     */
-    struct SourceImages
-    {
-        //! Source image paths and metadata.
-        const Panorama &panorama;
-        //! The loaded images.
-        std::vector<cv::Mat> images;
-        //! Sizes of the original images (but changed after warping).
-        std::vector<cv::Size> sizes;
-        std::shared_ptr<Logger> _logger;
-
-        /**
-         * @brief SourceImages
-         * @param panorama Source image paths and metadata.
-         */
-        SourceImages(const Panorama &panorama, std::shared_ptr<Logger> logger)
-            : panorama(panorama)
-            , images()
-            , sizes()
-            , _logger(logger)
-        {
-            resize(static_cast<size_t>(panorama.size()));
-            load();
-            ensureImageCount();
-        }
-
-        /**
-         * @brief clear
-         * Clear all storage.
-         */
-        void clear();
-
-        /**
-         * @brief ensureImageCount
-         * Throws if there are less than 2 images.
-         * @throws std::invalid_argument
-         */
-        void ensureImageCount();
-
-        /**
-         * @brief filter
-         * Remove images not in keep_indices.
-         * @param keep_indices
-         */
-        void filter(std::vector<int> &keep_indices);
-
-        /**
-         * @brief load
-         * Open images and load associated metadata.
-         */
-        void load();
-
-        /**
-         * @brief reload
-         * Reload original images.
-         */
-        void reload();
-
-        /**
-         * @brief resize
-         * @param new_size
-         * Resize storage vectors.
-         */
-        void resize(size_t new_size);
-
-        /**
-         * @brief scale
-         * Scale images in place.
-         * @param scale
-         * @param interpolation
-         */
-        void scale(double scale, int interpolation = cv::INTER_LINEAR_EXACT);
     };
 
     /**
@@ -492,6 +439,43 @@ private:
                  cv::Ptr<cv::detail::ExposureCompensator> &exposure_compensator,
                  WarpResults &warp_results, double work_scale,
                  float warped_image_scale, cv::Mat &result);
+
+    /**
+     * @brief debugFeatures
+     * Draw features on source images and save the results.
+     * @param source_images
+     * @param features
+     * @param scale
+     * @param flags
+     */
+    void debugFeatures(SourceImages &source_images,
+                       std::vector<cv::detail::ImageFeatures> &features,
+                       double scale,
+                       cv::DrawMatchesFlags flags = cv::DrawMatchesFlags::DEFAULT);
+
+    /**
+     * @brief debugMatches
+     * Draw feature matches on source images and save the results.
+     * @param source_images
+     * @param features
+     * @param matches
+     * @param scale
+     * @param conf_threshold
+     * @param flags
+     */
+    void debugMatches(SourceImages &source_images,
+                      std::vector<cv::detail::ImageFeatures> &features,
+                      std::vector<cv::detail::MatchesInfo> &matches,
+                      double scale,
+                      float conf_threshold,
+                      cv::DrawMatchesFlags flags = cv::DrawMatchesFlags::DEFAULT);
+
+    /**
+     * @brief debugWarpResults
+     * Save warp result images.
+     * @param warp_results
+     */
+    void debugWarpResults(WarpResults &warp_results);
 
     /**
      * @brief estimateCameraParameters
@@ -660,4 +644,3 @@ private:
 
 } // namespace stitcher
 } // namespace airmap
-

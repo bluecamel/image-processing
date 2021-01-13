@@ -2,48 +2,9 @@
 #include "cropper.h"
 #include "cubemap.h"
 #include <random>
-#include <sstream>
 
 namespace airmap {
 namespace stitcher {
-
-///
-/// @brief The ostream_logger class wraps the undelying/optional Logger and allows using
-/// it as a stream i.e.: define macro like this:
-///
-/// #define LOG(level) ostream_logger(_logger, Logger::Severity::level, "some category")
-///
-/// and then use within a class that has a _logger member like so:
-///
-/// LOG(info) << "foo" << 1;
-/// TODO: when this https://github.com/airmap/platform-sdk/pull/155/ is merged this class
-/// can be scrapped.
-///
-class ostream_logger : public std::stringstream
-{
-public:
-    ostream_logger(std::shared_ptr<Logger> underlying, Logger::Severity severity,
-                   const char *component)
-        : _underlying(underlying)
-        , _severity(severity)
-        , _component(component)
-    {
-    }
-
-    ~ostream_logger()
-    {
-        if (_underlying) {
-            _underlying->log(_severity, str().c_str(), _component);
-        }
-    }
-
-private:
-    std::shared_ptr<Logger> _underlying;
-    Logger::Severity _severity;
-    const char *_component;
-};
-
-#define LOG(level) ostream_logger(_logger, Logger::Severity::level, "stitcher")
 
 //
 //
@@ -176,8 +137,8 @@ void OpenCVStitcher::postprocess(cv::Mat &&result)
     cv::imwrite(_outputPath, result);
     LOG(info) << "Written stitched image to " << _outputPath << std::endl;
     if (_parameters.alsoCreateCubeMap) {
-        std::string base_path = (filesystem::path(_outputPath).parent_path()
-                                 / filesystem::path(_outputPath).stem())
+        std::string base_path = (path(_outputPath).parent_path()
+                                 / path(_outputPath).stem())
                                         .string();
         CubeMap::write(
                 result,
@@ -189,91 +150,6 @@ void OpenCVStitcher::postprocess(cv::Mat &&result)
                                  { CubeMap::Face::Bottom, base_path + ".bottom.jpg" } });
         LOG(info) << "Written cubemap of the stitched image to " << base_path
                   << std::endl;
-    }
-}
-
-//
-//
-// LowLevelOpenCVStitcher
-//
-//
-//! stitcher::SourceImages struct
-void LowLevelOpenCVStitcher::SourceImages::clear()
-{
-    images.clear();
-    sizes.clear();
-}
-
-void LowLevelOpenCVStitcher::SourceImages::ensureImageCount()
-{
-    if (images.size() < 2) { // TODO(bkd): constant
-        std::string message = "Need more images.";
-        LOG(error) << message.c_str();
-        throw std::invalid_argument(message);
-    }
-}
-
-void LowLevelOpenCVStitcher::SourceImages::filter(std::vector<int> &keep_indices)
-{
-    size_t original_count = images.size();
-    size_t keep_count = keep_indices.size();
-    std::vector<cv::Mat> images_;
-    std::vector<cv::Size> sizes_;
-
-    for (int keep_index : keep_indices) {
-        size_t index = static_cast<size_t>(keep_index);
-        images_.push_back(images[index]);
-        sizes_.push_back(sizes[index]);
-    }
-
-    images = images_;
-    sizes = sizes_;
-
-    LOG(debug) << "Discarded" << original_count - keep_count << "images.";
-
-    ensureImageCount();
-}
-
-void LowLevelOpenCVStitcher::SourceImages::load()
-{
-    time_t prevts = 0;
-    size_t i = 0;
-    for (GeoImage panorama_image : panorama) {
-        assert(prevts <= panorama_image.createdTimestampSec);
-        prevts = panorama_image.createdTimestampSec;
-
-        std::string path = panorama_image.path;
-        cv::Mat image = cv::imread(path);
-        if (image.empty()) {
-            std::stringstream ss;
-            ss << "Can't read image " << path;
-            throw std::invalid_argument(ss.str());
-        }
-
-        images[i] = image;
-        sizes[i] = image.size();
-        ++i;
-    }
-}
-
-void LowLevelOpenCVStitcher::SourceImages::reload()
-{
-    size_t new_size = static_cast<size_t>(panorama.size());
-    clear();
-    resize(new_size);
-    load();
-}
-
-void LowLevelOpenCVStitcher::SourceImages::resize(size_t new_size)
-{
-    images.resize(new_size);
-    sizes.resize(new_size);
-}
-
-void LowLevelOpenCVStitcher::SourceImages::scale(double scale, int interpolation)
-{
-    for (size_t i = 0; i < images.size(); ++i) {
-        cv::resize(images[i], images[i], cv::Size(), scale, scale, interpolation);
     }
 }
 
@@ -391,6 +267,88 @@ void LowLevelOpenCVStitcher::compose(
     cv::Mat result_mask;
     blender->blend(result, result_mask);
     LOG(debug) << "Finished composing stitched image.";
+}
+
+void LowLevelOpenCVStitcher::debugFeatures(SourceImages &source_images,
+        std::vector<cv::detail::ImageFeatures> &features,
+        double scale, cv::DrawMatchesFlags flags)
+{
+    if (!config.debug) { return; }
+
+    path image_path_base = config.debug_path / "features";
+    boost::filesystem::create_directories(image_path_base.string());
+
+    cv::Mat source_image, features_image;
+    for (size_t i = 0; i < features.size(); ++i) {
+        cv::resize(source_images.images[features[i].img_idx], source_image, cv::Size(), scale, scale);
+        cv::drawKeypoints(source_image, features[i].keypoints,
+                          features_image, cv::Scalar::all(-1), flags);
+
+        std::string image_name = (boost::format("%1%.jpg") % std::to_string(features[i].img_idx)).str();
+        std::string image_path = (image_path_base / image_name).string();
+
+        cv::imwrite(image_path, features_image);
+    }
+}
+
+void LowLevelOpenCVStitcher::debugMatches(SourceImages &source_images,
+        std::vector<cv::detail::ImageFeatures> &features,
+        std::vector<cv::detail::MatchesInfo> &matches,
+        double scale, float conf_threshold, cv::DrawMatchesFlags flags)
+{
+    if (!config.debug) { return; }
+
+    path image_path_base = config.debug_path / "matches";
+    boost::filesystem::create_directories(image_path_base.string());
+
+    const int num_matches = static_cast<int>(matches.size());
+    for (int i = 0; i < num_matches; ++i) {
+        cv::detail::MatchesInfo match = matches[i];
+        if (match.confidence < conf_threshold) {
+            continue;
+        }
+        
+        cv::Mat src_img, dst_img;
+        cv::resize(source_images.images[match.src_img_idx], src_img, cv::Size(), scale, scale, cv::INTER_LINEAR_EXACT);
+        cv::resize(source_images.images[match.dst_img_idx], dst_img, cv::Size(), scale, scale, cv::INTER_LINEAR_EXACT);
+
+        cv::Mat img_matches;
+
+        std::vector<cv::KeyPoint> src_keypoints = features[match.src_img_idx].getKeypoints();
+        std::vector<cv::KeyPoint> dst_keypoints = features[match.dst_img_idx].getKeypoints();
+        cv::drawMatches(src_img, src_keypoints, dst_img, dst_keypoints, match.matches, img_matches, cv::Scalar::all(-1),
+            cv::Scalar::all(-1), std::vector<char>(), flags);
+
+        std::string image_name = (boost::format("%1%_%2%.jpg") % std::to_string(match.src_img_idx) % std::to_string(match.dst_img_idx)).str();
+        std::string image_path = (image_path_base / image_name).string();
+
+        cv::imwrite(image_path, img_matches);
+    }
+
+    // Create and save matches graph.
+    std::vector<std::string> image_names;
+    image_names.reserve(source_images.images.size());
+    for (size_t i = 0; i < source_images.images.size(); ++i) {
+        image_names.push_back(std::to_string(i));
+    }
+    std::string matches_graph_path = (config.debug_path / "matches.dot").string();
+    std::ofstream matchesGraph(matches_graph_path);
+    matchesGraph << cv::detail::matchesGraphAsString(image_names, matches, conf_threshold);
+}
+
+void LowLevelOpenCVStitcher::debugWarpResults(WarpResults &warp_results)
+{
+    if (!config.debug) { return; }
+
+    path image_path_base = config.debug_path / "warp";
+    boost::filesystem::create_directories(image_path_base.string());
+
+    for (size_t i = 0; i < warp_results.images_warped.size(); ++i) {
+        std::string image_name = (boost::format("%1%.jpg") % std::to_string(i)).str();
+        std::string image_path = (image_path_base / image_name).string();
+
+        cv::imwrite(image_path, warp_results.images_warped[i]);
+    }
 }
 
 std::vector<cv::detail::CameraParams> LowLevelOpenCVStitcher::estimateCameraParameters(
@@ -809,10 +767,12 @@ void LowLevelOpenCVStitcher::stitch(cv::Mat &result)
     double work_scale = getWorkScale(source_images);
     double seam_scale = getSeamScale(source_images);
 
-    // Find features, scale images, and find matches.
+    // Find features, find matches, and scale images.
     auto features = findFeatures(source_images, work_scale);
-    source_images.scale(seam_scale);
+    debugFeatures(source_images, features, work_scale);
     auto matches = matchFeatures(features);
+    debugMatches(source_images, features, matches, work_scale, config.match_conf_thresh);
+    source_images.scale(seam_scale);
 
     // Filter images with poor matching.
     auto keep_indices = cv::detail::leaveBiggestComponent(
@@ -832,6 +792,7 @@ void LowLevelOpenCVStitcher::stitch(cv::Mat &result)
     float warped_image_scale = static_cast<float>(median_focal_length);
     auto warp_results =
             warpImages(source_images, cameras, warped_image_scale, seam_work_aspect);
+    debugWarpResults(warp_results);
 
     // Prepare exposure compensation.
     auto exposure_compensator = prepareExposureCompensation(warp_results);
@@ -896,8 +857,7 @@ LowLevelOpenCVStitcher::warpImages(SourceImages &source_images,
 
 void LowLevelOpenCVStitcher::waveCorrect(std::vector<cv::detail::CameraParams> &cameras)
 {
-    if (!config.wave_correct)
-        return;
+    if (!config.wave_correct) { return; }
 
     std::vector<cv::Mat> rmats;
     for (auto camera : cameras) {

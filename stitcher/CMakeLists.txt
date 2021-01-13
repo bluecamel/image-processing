@@ -10,6 +10,7 @@ set(Boost_USE_STATIC_LIBS ON)
 find_package(
     Boost REQUIRED
     program_options
+    filesystem
 )
 
 include_directories(
@@ -22,6 +23,7 @@ add_library(
     airmap_stitching
     src/cubemap.cpp
     src/cropper.cpp
+    src/images.cpp
     src/stitcher.cpp
     src/panorama.cpp
     3rdParty/TinyEXIF/TinyEXIF.cpp
@@ -42,6 +44,7 @@ target_link_libraries(
     airmap_stitcher
     airmap_stitching
     Boost::program_options
+    Boost::filesystem
 )
 
 #
@@ -54,4 +57,6 @@ install(TARGETS airmap_stitcher
 # Testing
 #
 enable_testing()
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test/bats)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/test/gtest/CMakeLists.txt)

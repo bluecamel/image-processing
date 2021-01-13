@@ -4,27 +4,7 @@
 
 #include "airmap/opencv_stitcher.h"
 using namespace airmap::stitcher;
-
-class stdoe_logger : public airmap::Logger {
-    public:
-    void log(Severity severity, const char* message, const char* component) override {
-        switch (severity){
-            case Severity::info:
-                std::cout << "[" << component << "]>" << message << std::flush;
-            break;
-            case Severity::debug:
-                std::cout << "[" << component << "]>" << message << std::flush;
-            break;
-            case Severity::error:
-                std::cerr << "[" << component << "]>" << message << std::flush;
-            break;
-        }
-    }
-
-    bool should_log(Severity, const char*, const char*) override {
-        return true;
-    }
-};
+using namespace airmap::logging;
 
 int main(int argc, char *argv[])
 {
@@ -38,13 +18,17 @@ int main(int argc, char *argv[])
             ("input_path", "input images will be sought for in this folder")
             ("output", boost::program_options::value<std::string>()->default_value("./panorama.jpg"),
                 "path to the resulting equirectangular stitching")
-            ("cubemap", "if set, also generates cubmap in <output>.<face>.jpg")
+            ("cubemap", "if set, also generates cubemap in <output>.<face>.jpg")
             ("ram_budget",
                 boost::program_options::value<size_t>()->default_value(Panorama::Parameters::defaultMemoryBudgetMB()),
                 "RAM buget (in MB) the stitcher can assume it can use")
             ("retries",
                 boost::program_options::value<size_t>()->default_value(6),
-                "The stitching process is non-deterministic, this increases chances to succeed");
+                "The stitching process is non-deterministic, this increases chances to succeed")
+            ("debug", "If set, debug artifacts (e.g. detected features, matches, warping, etc.) will be created in <debug_output>.")
+            ("debug_path", boost::program_options::value<std::string>()->default_value("debug"),
+                "Path to the debug output.")
+            ;
     try {
         boost::program_options::positional_options_description positional;
         positional.add("input", -1);
@@ -67,9 +51,14 @@ int main(int argc, char *argv[])
         std::list<GeoImage> input;
         for (std::string path : vm["input"].as<std::vector<std::string>>()) {
             if (vm.count("input_path")) {
-                path = (airmap::filesystem::path(vm["input_path"].as<std::string>()) / path).string();
+                path = (boost::filesystem::path(vm["input_path"].as<std::string>()) / path).string();
             }
             input.push_back(GeoImage::fromExif(path));
+        }
+
+        std::string debugPath;
+        if (vm.count("debug")) {
+            debugPath = boost::filesystem::path(vm["debug_path"].as<std::string>()).string();
         }
 
         auto logger = std::make_shared<stdoe_logger>();
