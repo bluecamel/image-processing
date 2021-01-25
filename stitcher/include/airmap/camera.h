@@ -1,5 +1,7 @@
 #pragma once
 
+#include "distortion.h"
+
 #include <boost/optional.hpp>
 #include <opencv2/core/utility.hpp>
 
@@ -11,122 +13,15 @@ namespace stitcher {
  * Contains information about the camera, including
  * intrinsics, distortion coefficients, and field of view.
  *
- * NOTE(bkd):
- * This isn't used currently, but will be soon, at least for
- * undistortion.  For undistortion, we'll need to detect the
- * camera model, and use the associated intrinsics and
- * distortion coefficients to undistort the images.
- * This also could be used for estimatiion based on known camera
- * intrinsics and gimbal orientation.
+ * This is currently used for undistortion, homography calculation,
+ * and rotation calculation.
+ *
+ * OpenCV camera calibration documentation:
+ *  - https://docs.opencv.org/4.2.0/d9/d0c/group__calib3d.html#ga3207604e4b1a1758aa66acb6ed5aa65d
  */
 struct Camera
 {
     enum class FOVUnits { Degrees, Radians };
-
-    /**
-     * @brief CameraDistortion
-     * Camera distortion coefficients.
-     */
-    struct Distortion
-    {
-        /**
-         * @brief Distortion.
-         * Create camera distortion coefficients.
-         * The order of parameters is consistent with OpenCV.
-         */
-        Distortion(double _k1, double _k2, double _p1, double _p2, double _k3)
-        {
-            _coefficients = { _k1, _k2, _k3, _p1, _p2 };
-        }
-
-        Distortion(cv::Mat &vector)
-        {
-            double k1 = vector.at<double>(0, 0);
-            double k2 = vector.at<double>(1, 0);
-            double p1 = vector.at<double>(2, 0);
-            double p2 = vector.at<double>(3, 0);
-            double k3 = vector.at<double>(4, 0);
-            _coefficients = { k1, k2, k3, p1, p2 };
-        }
-
-        Distortion()
-        {
-            _coefficients = { 0.0, 0.0, 0.0, 0.0, 0.0 };
-        }
-
-        /**
-         * @brief Coefficients vector.
-         */
-        cv::Mat coefficients()
-        {
-            return (cv::Mat_<double>(5, 1) <<
-                k1(), k2(), p1(), p2(), k3());
-        }
-
-        /**
-         * @brief k1
-         * k1 coefficient
-         */
-        double k1() const
-        {
-            return _coefficients[0];
-        }
-
-        /**
-         * @brief k2
-         * k2 coefficient
-         */
-        double k2() const
-        {
-            return _coefficients[1];
-        }
-
-        /**
-         * @brief k3
-         * k3 coefficient
-         */
-        double k3() const
-        {
-            return _coefficients[2];
-        }
-
-        /**
-         * @brief p1
-         * p1 coefficient
-         */
-        double p1() const
-        {
-            return _coefficients[3];
-        }
-
-        /**
-         * @brief p2
-         * p2 coefficient
-         */
-        double p2() const
-        {
-            return _coefficients[4];
-        }
-
-        bool operator==(const Distortion &other) const
-        {
-            return _coefficients == other._coefficients;
-        }
-
-        friend std::ostream& operator<<(std::ostream &os,
-                                        const Distortion &distortion)
-        {
-            return os << "k1: " << std::to_string(distortion.k1())
-                      << " k2: " << std::to_string(distortion.k2())
-                      << " k3: " << std::to_string(distortion.k3())
-                      << " p1: " << std::to_string(distortion.p1())
-                      << " p2: " << std::to_string(distortion.p2())
-                      << std::endl;
-        }
-
-        protected:
-            std::array<double, 5> _coefficients;
-    };
 
     /**
      * @brief calibration_intrinsics;
@@ -135,10 +30,10 @@ struct Camera
     boost::optional<cv::Mat> calibration_intrinsics;
 
     /**
-     * @brief distortion
-     * Distortion coefficients.
+     * @brief distortion_model
+     * Distortion model.
      */
-    Distortion distortion;
+    std::shared_ptr<DistortionModel> distortion_model;
 
     /**
      * @brief focal_length_meters
@@ -170,14 +65,15 @@ struct Camera
      */
     Camera(double _focal_length_meters, cv::Point2d _sensor_dimensions_meters,
            cv::Point2d _sensor_dimensions_pixels, cv::Point2d _principal_point,
-           Distortion _distortion,
-           boost::optional<cv::Mat> _calibration_intrinsics = boost::optional<cv::Mat>())
+           boost::optional<cv::Mat> _calibration_intrinsics =
+               boost::optional<cv::Mat>(),
+           std::shared_ptr<DistortionModel> _distortion_model = nullptr)
         : focal_length_meters(_focal_length_meters)
         , sensor_dimensions_meters(_sensor_dimensions_meters)
         , sensor_dimensions_pixels(_sensor_dimensions_pixels)
         , principal_point(_principal_point)
-        , distortion(_distortion)
         , calibration_intrinsics(_calibration_intrinsics)
+        , distortion_model(std::move(_distortion_model))
     {
     }
 
@@ -193,7 +89,7 @@ struct Camera
      * @brief focalLengthPixels
      * Focal length in pixels.
      */
-    cv::Point2d focalLengthPixels()
+    cv::Point2d focalLengthPixels() const
     {
         double x = focal_length_meters * sensor_dimensions_pixels.x / sensor_dimensions_meters.x;
         double y = focal_length_meters * sensor_dimensions_pixels.y / sensor_dimensions_meters.y;
@@ -205,7 +101,7 @@ struct Camera
      * Horizontal and vertical fields of view.
      * @params units - degrees or radians
      */
-    cv::Point2d fov(FOVUnits units = FOVUnits::Radians)
+    cv::Point2d fov(FOVUnits units = FOVUnits::Radians) const
     {
         double x = 2 * atan(sensor_dimensions_meters.x / (2 * focal_length_meters));
         double y = 2 * atan(sensor_dimensions_meters.y / (2 * focal_length_meters));
@@ -222,7 +118,7 @@ struct Camera
      * @brief Intrinsics matrix.
      * @param scale
      */
-    cv::Mat K(double scale = 1.0)
+    cv::Mat K(double scale = 1.0) const
     {
         if (calibration_intrinsics.has_value()) {
             cv::Mat K;
