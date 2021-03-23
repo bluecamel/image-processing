@@ -8,9 +8,81 @@
 #include <utility>
 #include <string>
 
-#include <boost/filesystem.hpp>
-
 namespace airmap {
+namespace filesystem {
+
+/**
+ * @brief The path class is a basic ersatz for a std::filesystem (C++17) or boost::filesystem
+ * that doesn't require linking anything
+ * 
+ * boost::filesystem::path is used in other parts of the project, but keeping it
+ * it out of the headers so that consuming projects don't have to link to boost
+ * if only using headers.
+ */
+class path {
+    public:
+        path();
+        path(const char& p);
+        path(const std::string& p);
+
+        inline std::string string() const {
+            return _path;
+        }
+
+        path filename() const;
+        path parent_path() const;
+        path stem() const;
+
+        inline bool operator==(const path& other) const {
+            return _path == other._path;
+        }
+
+        inline bool operator!=(const path& other) const {
+            return _path != other._path;
+        }
+
+        inline static std::string dot() {
+#ifdef _WIN32
+            return L".";
+#else
+            return ".";
+#endif
+        }
+
+        inline static std::string dot_dot() {
+#ifdef _WIN32
+            return L"..";
+#else
+            return "..";
+#endif
+        }
+
+        inline static path dot_path() {
+            return path(dot());
+        }
+
+        inline static path dot_dot_path() {
+            return path(dot_dot());
+        }
+
+        inline static char separator() {
+#ifdef _WIN32
+            return '\\';
+#else
+            return '/';
+#endif
+        }
+
+        inline path operator/(const path& other) const {
+            return _path + separator() + other._path;
+        }
+
+    private:
+        std::string _path;
+};
+
+} // namespace filesystem
+
 namespace stitcher {
 
 class geocoordinate_t : public std::pair<double, double>
@@ -127,6 +199,7 @@ public:
         inline explicit Parameters(
                 size_t _memoryBudgetMB,
                 bool _alsoCreateCubeMap = true,
+                bool _enableOpenCL = true,
                 size_t _retries = 6,
                 double _maximumCropRatio = 99. / 100,
                 size_t _maxInputImageSize =
@@ -134,6 +207,7 @@ public:
                 )
             : memoryBudgetMB { _memoryBudgetMB }
             , alsoCreateCubeMap(_alsoCreateCubeMap)
+            , enableOpenCL(_enableOpenCL)
             , retries(_retries)
             , maxInputImageSize { _maxInputImageSize }
             , maximumCropRatio { _maximumCropRatio }
@@ -163,6 +237,11 @@ public:
          */
         bool alsoCreateCubeMap;
 
+        /**
+         * @brief enableOpenCL
+         * Enable OpenCL support, if the hardware supports it.
+         */
+        bool enableOpenCL;
 
         /**
          * @brief retries
@@ -184,7 +263,7 @@ public:
 
         /**
          * @brief maximumCropRatio
-         *  Maximum distortion ratio of the inner crop area to the outer crop area.
+         * Maximum distortion ratio of the inner crop area to the outer crop area.
          * Closer to zero means to permit more cropping (and distortion of the
          * panorama). Closer to one means to limit the amount of cropped area.
          *

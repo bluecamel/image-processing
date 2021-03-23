@@ -1,6 +1,6 @@
 #pragma once
 
-#include "images.h"
+#include "airmap/images.h"
 
 #include "boost/filesystem.hpp"
 #include "boost/format.hpp"
@@ -23,7 +23,21 @@ namespace stitcher {
 class DistortionModel
 {
 public:
-    DistortionModel(bool enabled_ = true);
+    using CropROICb = std::function<const cv::Rect(const cv::Mat &image)>;
+    DistortionModel(bool enabled_ = true, CropROICb crop_roi_cb_ = nullptr);
+    virtual ~DistortionModel() = 0;
+
+    /**
+     * @brief crop
+     * Crop a single image.
+     */
+    void crop(cv::Mat &image, cv::Rect &roi);
+
+    /**
+     * @brief crop
+     * Crop multiple images.
+     */
+    void crop(std::vector<cv::Mat> &images);
 
     /**
      * @brief enabled
@@ -50,6 +64,7 @@ public:
 
 protected:
     bool _enabled;
+    CropROICb _crop_roi_cb;
 };
 
 /**
@@ -166,7 +181,8 @@ public:
      * @param parameters_ Distortion model parameters
      * @param enabled_ Whether the model is enabled (enabling undistortion).
      */
-    PinholeDistortionModel(const Parameters parameters_, bool enabled_ = true);
+    PinholeDistortionModel(const Parameters parameters_, bool enabled_ = true,
+                           CropROICb crop_roi_cb_ = nullptr);
 
     /**
      * @brief undistort
@@ -327,7 +343,8 @@ public:
      * @param enabled_ Whether undistortion is enabled.
      */
     ScaramuzzaDistortionModel(const Parameters parameters_,
-                              bool enabled_ = true);
+                              bool enabled_ = true,
+                              CropROICb crop_roi_cb_ = nullptr);
 
     /**
      * @brief createPerspectiveUndistortionMaps

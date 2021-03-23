@@ -1,9 +1,9 @@
 #pragma once
 
 #include <boost/format.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/optional.hpp>
 
+#include <opencv2/core/ocl.hpp>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -20,15 +20,13 @@
 #include <opencv2/stitching/detail/warpers.hpp>
 #include <opencv2/stitching/warpers.hpp>
 
-#include "camera.h"
-#include "camera_models.h"
-#include "distortion.h"
-#include "gimbal.h"
-#include "images.h"
-#include "logger.h"
-#include "stitcher.h"
-
-using boost::filesystem::path;
+#include "airmap/camera.h"
+#include "airmap/camera_models.h"
+#include "airmap/distortion.h"
+#include "airmap/gimbal.h"
+#include "airmap/images.h"
+#include "airmap/logging.h"
+#include "airmap/stitcher.h"
 
 namespace airmap {
 namespace stitcher {
@@ -43,27 +41,21 @@ public:
                    const Panorama::Parameters &parameters,
                    const std::string &outputPath,
                    std::shared_ptr<Logger> logger,
-                   bool debug = false, path debugPath = path("debug"))
-        : _panorama(panorama)
-        , _parameters(parameters)
-        , _outputPath(outputPath)
-        , _logger(logger)
-        , _debug(debug)
-        , _debugPath(debugPath)
-    {
-    }
+                   bool debug = false, path debugPath = path("debug"));
 
     Report stitch() override;
     void cancel() override;
     void postprocess(cv::Mat&& result);
+    void setFallbackMode() override;
+    void setUseOpenCL(bool enabled = true);
 
 protected:
     bool _debug;
     path _debugPath;
+    std::shared_ptr<Logger> _logger;
     Panorama _panorama;
     Panorama::Parameters _parameters;
     std::string _outputPath;
-    std::shared_ptr<Logger> _logger;
 };
 
 /**
@@ -481,7 +473,7 @@ private:
      * @param source_images
      * @param path
      */
-    void debugImages(SourceImages &source_images, path debug_path);
+    void debugImages(std::vector<cv::Mat> &images, path debug_path);
 
     /**
      * @brief debugMatches
@@ -654,6 +646,17 @@ private:
      * @param source_images Source images object.
      */
     void undistortImages(SourceImages &source_images);
+
+    /**
+     * @brief undistortCropImages
+     * Optionally crop images based on the distortion model.
+     * camera model can be identified, and is required for that camera.
+     * This happens after feature matching and bundle adjustment so that the
+     * entire frame can be used for computing the homography before cropping
+     * removes areas where there are good features.
+     * @param source_images Source images object.
+     */
+    void undistortCropImages(SourceImages &source_images);
 
     /**
      * @brief warpImages

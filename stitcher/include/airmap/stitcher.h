@@ -4,7 +4,7 @@
 #include <atomic>
 
 #include "airmap/panorama.h"
-#include "airmap/logger.h"
+#include "airmap/logging.h"
 
 namespace airmap {
 namespace stitcher {
@@ -50,11 +50,24 @@ public:
     virtual ~Stitcher() = default;
 
     /**
+     * @brief cancel
+     * Cancel an active stitch.
+     */
+    virtual void cancel() = 0;
+
+    /**
+     * @brief setFallbackMode
+     * Set fallback mode.  Fallback mode might be enabled after a failure,
+     * so that the stitcher can fallback to safer settings
+     * (e.g. disabling OpenCL).
+     */
+    virtual void setFallbackMode() {}
+
+    /**
      * @brief stitch is the Stitcher's main entry - subclasses should
      * fill with the actual stitching.
      */
     virtual Report stitch() = 0;
-    virtual void cancel() = 0;
 };
 
 /**
@@ -66,11 +79,16 @@ class RetryingStitcher : public Stitcher
 public:
     RetryingStitcher(SharedPtr underlying,
                      const Panorama::Parameters &parameters,
-                     std::shared_ptr<Logger> logger)
+                     std::shared_ptr<logging::Logger> logger)
         : _underlying(underlying)
         , _retries(parameters.retries)
         , _logger(logger)
     {
+    }
+
+    void cancel() override {
+        _retries = 0;
+        _underlying->cancel();
     }
 
     Report stitch() override {
@@ -81,22 +99,19 @@ public:
                 if (_retries == 0) {
                     throw;
                 }
+                _underlying->setFallbackMode();
                 std::stringstream ss;
                 ss << "Stitching failed with " << e.what() << ", retrying, retries left " << _retries - i;
-                _logger->log(Logger::Severity::error, ss.str().c_str(), "stitcher");
+                _logger->log(logging::Logger::Severity::error, ss.str().c_str(), "stitcher");
             }
         }
         return _underlying->stitch();
-    }
-    void cancel() override {
-        _retries = 0;
-        _underlying->cancel();
     }
 
 private:
     Stitcher::SharedPtr _underlying;
     std::atomic<size_t> _retries;
-    std::shared_ptr<Logger> _logger;
+    std::shared_ptr<logging::Logger> _logger;
 };
 
 

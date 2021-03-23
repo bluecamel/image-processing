@@ -10,8 +10,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#ifndef AIRMAP_LOGGER_H_
-#define AIRMAP_LOGGER_H_
+#pragma once
 
 #include <airmap/do_not_copy_or_move.h>
 #include <airmap/visibility.h>
@@ -43,6 +42,13 @@ class AIRMAP_EXPORT Logger : DoNotCopyOrMove {
   /// Implementation should handle the case of component being a nullptr
   /// gracefully.
   virtual void log(Severity severity, const char* message, const char* component) = 0;
+
+  /// accepts a std::stringstream and converts to char* before passing to the
+  /// main log function.
+  void log(Severity severity, std::stringstream &message, const char* component)
+  {
+      log(severity, message.str().c_str(), component);
+  }
 
   /// should_log should return true if 'message' with 'severity' originating from
   /// 'component' should be logged.
@@ -110,8 +116,6 @@ private:
     const char *_component;
 };
 
-#define LOG(level) ostream_logger(_logger, Logger::Severity::level, "stitcher")
-
 class stdoe_logger : public Logger {
     public:
     void log(Severity severity, const char* message, const char* component) override {
@@ -133,7 +137,7 @@ class stdoe_logger : public Logger {
     }
 };
 
+#define LOG(level) ostream_logger(std::make_shared<stdoe_logger>(), Logger::Severity::level, "stitcher")
+
 } // namespace logging
 } // namespace airmap
-
-#endif  // AIRMAP_LOGGER_H_
