@@ -25,8 +25,12 @@ add_library(
     src/cropper.cpp
     src/distortion.cpp
     src/images.cpp
-    src/stitcher.cpp
+    src/monitor/estimator.cpp
+    src/monitor/monitor.cpp
+    src/monitor/timer.cpp
+    src/opencv/seam_finders.cpp
     src/panorama.cpp
+    src/stitcher.cpp
     3rdParty/TinyEXIF/TinyEXIF.cpp
     3rdParty/TinyEXIF/tinyxml2.cpp
 )
