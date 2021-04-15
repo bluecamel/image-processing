@@ -21,16 +21,21 @@ include_directories(
 
 add_library(
     airmap_stitching
+    src/camera.cpp
+    src/camera_models.cpp
     src/cubemap.cpp
     src/cropper.cpp
     src/distortion.cpp
+    src/gimbal.cpp
     src/images.cpp
     src/monitor/estimator.cpp
     src/monitor/monitor.cpp
     src/monitor/timer.cpp
+    src/opencv/forward.cpp
     src/opencv/seam_finders.cpp
     src/panorama.cpp
     src/stitcher.cpp
+    src/stitcher_configuration.cpp
     3rdParty/TinyEXIF/TinyEXIF.cpp
     3rdParty/TinyEXIF/tinyxml2.cpp
 )

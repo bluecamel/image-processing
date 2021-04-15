@@ -4,22 +4,26 @@ namespace airmap {
 namespace stitcher {
 namespace monitor {
 
-Estimator::Estimator(const boost::optional<Camera> camera,
-                     const std::shared_ptr<Logger> logger, UpdatedCb updatedCb,
-                     bool enabled, bool logEnabled)
-    : _camera(camera)
-    , _currentEstimate(0)
+OperationsEstimator::OperationsEstimator(const std::shared_ptr<Camera> camera,
+                             const std::shared_ptr<airmap::logging::Logger> logger,
+                             UpdatedCb updatedCb, bool enabled, bool logEnabled)
+    : Estimator(logger, updatedCb, enabled, logEnabled)
+    , _camera(camera)
     , _currentOperation(Operation::Start())
     , _currentOperationProgress(0.)
-    , _currentProgress(-1.)
-    , _enabled(enabled || logEnabled)
-    , _logEnabled(logEnabled)
-    , _logger(logger)
-    , _updatedCb(updatedCb)
 {
 }
 
-void Estimator::changeOperation(const Operation &operation)
+OperationsEstimator::SharedPtr
+OperationsEstimator::create(const std::shared_ptr<Camera> camera,
+                      const std::shared_ptr<airmap::logging::Logger> logger,
+                      UpdatedCb updatedCb, bool enabled, bool logEnabled)
+{
+    return std::make_shared<OperationsEstimator>(camera, logger, updatedCb, enabled,
+                                           logEnabled);
+}
+
+void OperationsEstimator::changeOperation(const Operation &operation)
 {
     if (!_enabled) {
         return;
@@ -37,7 +41,7 @@ void Estimator::changeOperation(const Operation &operation)
     updated();
 }
 
-const ElapsedTime Estimator::currentEstimate() const
+const ElapsedTime OperationsEstimator::currentEstimate() const
 {
     if (!_enabled) {
         return ElapsedTime::fromSeconds(0);
@@ -58,7 +62,7 @@ const ElapsedTime Estimator::currentEstimate() const
     return estimatedTimeRemaining() * elapsedToEstimateRatio();
 }
 
-double Estimator::currentProgress() const
+double OperationsEstimator::currentProgress() const
 {
     if (!_enabled) {
         return 0.;
@@ -79,18 +83,7 @@ double Estimator::currentProgress() const
     return 100. * (1. - estimatedTimeRemaining() / estimatedTimeTotal());
 }
 
-void Estimator::disable()
-{
-    _enabled = false;
-    _logEnabled = false;
-}
-
-void Estimator::disableLog()
-{
-    _logEnabled = false;
-}
-
-double Estimator::elapsedToEstimateRatio() const
+double OperationsEstimator::elapsedToEstimateRatio() const
 {
     OperationDoubleMap _elapsedToEstimateRatios = elapsedToEstimateRatios();
     double _elapsedToEstimateRatio { std::accumulate(
@@ -108,7 +101,7 @@ double Estimator::elapsedToEstimateRatio() const
     return _elapsedToEstimateRatio;
 }
 
-const OperationDoubleMap Estimator::elapsedToEstimateRatios() const
+const OperationDoubleMap OperationsEstimator::elapsedToEstimateRatios() const
 {
     OperationDoubleMap _elapsedToEstimateRatios;
     if (_operationTimesCb) {
@@ -140,22 +133,7 @@ const OperationDoubleMap Estimator::elapsedToEstimateRatios() const
     return _elapsedToEstimateRatios;
 }
 
-void Estimator::enable()
-{
-    _enabled = true;
-}
-
-void Estimator::enableLog()
-{
-    _enabled = true;
-    _logEnabled = true;
-}
-
-const std::string Estimator::estimateLogPrefix = "Estimated time remaining: ";
-
-const std::string Estimator::progressLogPrefix = "Progress: ";
-
-const ElapsedTime Estimator::estimatedTimeRemaining() const
+const ElapsedTime OperationsEstimator::estimatedTimeRemaining() const
 {
     return std::accumulate(std::begin(_operationEstimates), std::end(_operationEstimates),
                            ElapsedTime::fromSeconds(0),
@@ -176,7 +154,7 @@ const ElapsedTime Estimator::estimatedTimeRemaining() const
                            });
 }
 
-const ElapsedTime Estimator::estimatedTimeTotal() const
+const ElapsedTime OperationsEstimator::estimatedTimeTotal() const
 {
     return { std::accumulate(
             std::begin(_operationEstimates), std::end(_operationEstimates),
@@ -186,7 +164,7 @@ const ElapsedTime Estimator::estimatedTimeTotal() const
             }) };
 }
 
-const OperationElapsedTimesMap Estimator::estimateOperations() const
+const OperationElapsedTimesMap OperationsEstimator::estimateOperations() const
 {
     OperationElapsedTimesMap operationEstimates;
 
@@ -194,12 +172,11 @@ const OperationElapsedTimesMap Estimator::estimateOperations() const
         return operationEstimates;
     }
 
-    if (_camera.has_value()) {
-        Camera camera = _camera.get();
-
-        if (camera.distortion_model) {
+    if (_camera) {
+        if (_camera->distortion_model) {
             PinholeDistortionModel *pinholeDistortionModel =
-                    dynamic_cast<PinholeDistortionModel *>(camera.distortion_model.get());
+                dynamic_cast<PinholeDistortionModel *>(
+                    _camera->distortion_model.get());
             if (pinholeDistortionModel) {
                 operationEstimates.clear();
                 operationEstimates.insert(std::make_pair(
@@ -232,8 +209,8 @@ const OperationElapsedTimesMap Estimator::estimateOperations() const
             }
 
             ScaramuzzaDistortionModel *scaramuzzaDistortionModel =
-                    dynamic_cast<ScaramuzzaDistortionModel *>(
-                            camera.distortion_model.get());
+                dynamic_cast<ScaramuzzaDistortionModel *>(
+                    _camera->distortion_model.get());
             if (scaramuzzaDistortionModel) {
                 operationEstimates.insert(std::make_pair(
                         Operation::Start().value(), ElapsedTime::fromMilliseconds(1500)));
@@ -289,51 +266,17 @@ const OperationElapsedTimesMap Estimator::estimateOperations() const
     return operationEstimates;
 }
 
-void Estimator::log() const
-{
-    if (!_enabled || !_logEnabled) {
-        return;
-    }
-
-    _logger->log(Logger::Severity::info,
-                 (estimateLogPrefix + currentEstimate().str()).c_str(), "stitcher");
-
-    _logger->log(Logger::Severity::info,
-                 (progressLogPrefix + std::to_string(currentProgress())).c_str(),
-                 "stitcher");
-}
-
-const OperationElapsedTimesMap Estimator::operationEstimateTimes() const
+const OperationElapsedTimesMap OperationsEstimator::operationEstimateTimes() const
 {
     return _operationEstimates;
 }
 
-void Estimator::setCurrentEstimate(const std::string &estimatedTimeRemaining)
-{
-    if (!_enabled) {
-        return;
-    }
-
-    _currentEstimate = { estimatedTimeRemaining };
-    updated();
-}
-
-void Estimator::setCurrentProgress(const std::string &progress)
-{
-    if (!_enabled) {
-        return;
-    }
-
-    _currentProgress = std::stod(progress);
-    updated();
-}
-
-void Estimator::setOperationTimesCb(const OperationTimesCb operationTimesCb)
+void OperationsEstimator::setOperationTimesCb(const OperationTimesCb operationTimesCb)
 {
     _operationTimesCb = operationTimesCb;
 }
 
-void Estimator::updateCurrentOperation(double progress)
+void OperationsEstimator::updateCurrentOperation(double progress)
 {
     if (!_enabled) {
         return;
@@ -342,15 +285,6 @@ void Estimator::updateCurrentOperation(double progress)
     _currentOperationProgress = progress;
     log();
     updated();
-}
-
-void Estimator::updated() const
-{
-    if (!_enabled) {
-        return;
-    }
-
-    _updatedCb();
 }
 
 } // namespace monitor

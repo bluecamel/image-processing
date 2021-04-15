@@ -1,7 +1,16 @@
 #pragma once
 
-#include <boost/format.hpp>
-#include <boost/optional.hpp>
+#include "airmap/camera.h"
+#include "airmap/camera_models.h"
+#include "airmap/distortion.h"
+#include "airmap/gimbal.h"
+#include "airmap/images.h"
+#include "airmap/logging.h"
+#include "airmap/monitor/estimator.h"
+#include "airmap/opencv/forward.h"
+#include "airmap/opencv/seam_finders.h"
+#include "airmap/stitcher.h"
+#include "airmap/stitcher_configuration.h"
 
 #include <opencv2/core/ocl.hpp>
 #include <opencv2/core/utility.hpp>
@@ -20,19 +29,10 @@
 #include <opencv2/stitching/detail/warpers.hpp>
 #include <opencv2/stitching/warpers.hpp>
 
-#include "airmap/camera.h"
-#include "airmap/camera_models.h"
-#include "airmap/distortion.h"
-#include "airmap/gimbal.h"
-#include "airmap/images.h"
-#include "airmap/logging.h"
-#include "airmap/monitor/estimator.h"
-#include "airmap/opencv/seam_finders.h"
-#include "airmap/stitcher.h"
-#include "airmap/stitcher_configuration.h"
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
 
-using MonitoredGraphCutSeamFinder =
-        airmap::stitcher::opencv::detail::MonitoredGraphCutSeamFinder;
+using boost::filesystem::path;
 
 namespace airmap {
 namespace stitcher {
@@ -41,11 +41,13 @@ namespace stitcher {
  * @brief The OpenCVStitcher performs basic, same callstack stitching using OpenCV
  * high level stitching API.
  */
-class OpenCVStitcher : public MonitoredStitcher {
+class OpenCVStitcher : public OperationsMonitoredStitcher
+{
 public:
     OpenCVStitcher(
             const Panorama &panorama, const Panorama::Parameters &parameters,
-            const std::string &outputPath, std::shared_ptr<Logger> logger,
+            const std::string &outputPath,
+            std::shared_ptr<airmap::logging::Logger> logger,
             monitor::Estimator::UpdatedCb updatedCb = []() {}, bool debug = false,
             path debugPath = path("debug"));
 
@@ -58,7 +60,7 @@ public:
 protected:
     bool _debug;
     path _debugPath;
-    std::shared_ptr<Logger> _logger;
+    std::shared_ptr<airmap::logging::Logger> _logger;
     Panorama _panorama;
     Panorama::Parameters _parameters;
     std::string _outputPath;
@@ -116,11 +118,12 @@ public:
      * Create an instance of the stitcher with the given configuration.
      * @param config
      */
-    LowLevelOpenCVStitcher(const Configuration &config, const Panorama &panorama,
-                           const Panorama::Parameters &parameters,
-                           const std::string &outputPath, std::shared_ptr<Logger> logger,
-                           monitor::Estimator::UpdatedCb updatedCb = []() {},
-                           bool debug = false, path debugPath = path("debug"));
+    LowLevelOpenCVStitcher(
+            const Configuration &config, const Panorama &panorama,
+            const Panorama::Parameters &parameters, const std::string &outputPath,
+            std::shared_ptr<airmap::logging::Logger> logger,
+            monitor::Estimator::UpdatedCb updatedCb = []() {}, bool debug = false,
+            path debugPath = path("debug"));
 
     Report stitch() override;
     void cancel() override;

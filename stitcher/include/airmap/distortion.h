@@ -1,17 +1,12 @@
 #pragma once
 
+#include <array>
+#include <functional>
+
 #include "airmap/images.h"
+#include "airmap/opencv/forward.h"
 
-#include "boost/filesystem.hpp"
-#include "boost/format.hpp"
-
-#include <opencv2/calib3d.hpp>
-#include <opencv2/core.hpp>
-#include <opencv2/core/utility.hpp>
-#include "opencv2/imgproc.hpp"
-#include "opencv2/imgcodecs.hpp"
-
-using boost::filesystem::path;
+using airmap::stitcher::opencv::noArray;
 
 namespace airmap {
 namespace stitcher {
@@ -52,7 +47,7 @@ public:
      * @param K Camera intrinsics matrix.
      */
     virtual void undistort(std::vector<cv::Mat> &images,
-                           cv::InputArray K = cv::noArray()) = 0;
+                           cv::InputArray K = noArray()) = 0;
 
     /**
      * @brief undistort
@@ -60,7 +55,7 @@ public:
      * @param image Image to undistort.
      * @param K Camera intrinsics matrix.
      */
-    virtual void undistort(cv::Mat &image, cv::InputArray K = cv::noArray()) = 0;
+    virtual void undistort(cv::Mat &image, cv::InputArray K = noArray()) = 0;
 
 protected:
     bool _enabled;
@@ -190,8 +185,7 @@ public:
      * @param images Images to undistort.
      * @param K Camera intrinsics matrix.
      */
-    void undistort(std::vector<cv::Mat> &images,
-                   cv::InputArray K = cv::noArray());
+    void undistort(std::vector<cv::Mat> &images, cv::InputArray K = noArray());
 
     /**
      * @brief undistort
@@ -199,7 +193,7 @@ public:
      * @param image Image to undistort.
      * @param K Camera intrinsics matrix.
      */
-    void undistort(cv::Mat &image, cv::InputArray K = cv::noArray());
+    void undistort(cv::Mat &image, cv::InputArray K = noArray());
 
 protected:
     /**
@@ -360,7 +354,7 @@ public:
      * @param image Image to undistort.
      * @param K Camera intrinsics matrix.
      */
-    void undistort(cv::Mat &image, cv::InputArray K = cv::noArray());
+    void undistort(cv::Mat &image, cv::InputArray K = noArray());
 
     /**
      * @brief undistort
@@ -368,8 +362,7 @@ public:
      * @param images Images to undistort.
      * @param K Camera intrinsics matrix.
      */
-    void undistort(std::vector<cv::Mat> &images,
-                   cv::InputArray K = cv::noArray());
+    void undistort(std::vector<cv::Mat> &images, cv::InputArray K = noArray());
 
     /**
      * @brief worldToCamera

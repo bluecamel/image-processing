@@ -9,8 +9,6 @@
 #include "airmap/monitor/operation.h"
 #include "airmap/monitor/timer.h"
 
-using Logger = airmap::logging::Logger;
-
 namespace airmap {
 namespace stitcher {
 namespace monitor {
@@ -23,8 +21,17 @@ class Monitor {
 public:
     using SharedPtr = std::shared_ptr<Monitor>;
 
-    Monitor(Estimator &estimator, std::shared_ptr<Logger> logger,
-            bool enabled = false, bool logEnabled = false);
+    Monitor(OperationsEstimator::SharedPtr estimator,
+            std::shared_ptr<airmap::logging::Logger> logger, bool enabled = false,
+            bool logEnabled = false);
+
+    static Monitor::SharedPtr create(OperationsEstimator::SharedPtr estimator,
+                                     std::shared_ptr<airmap::logging::Logger> logger,
+                                     bool enabled = false, bool logEnabled = false);
+
+    static Monitor::SharedPtr create(Estimator::SharedPtr estimator,
+                                     std::shared_ptr<airmap::logging::Logger> logger,
+                                     bool enabled = false, bool logEnabled = false);
 
     /**
      * @brief changeOperation
@@ -64,6 +71,12 @@ public:
     void enableLog();
 
     /**
+     * @brief estimator
+     * Returns a pointer to the estimator.
+     */
+    OperationsEstimator::SharedPtr estimator();
+
+    /**
      * @brief operationTimes
      * Returns a map of elapsed times for each operation.
      */
@@ -79,9 +92,9 @@ public:
 private:
     /**
      * @brief _estimator
-     * A reference to an instance of an estimator.
+     * A pointer to an instance of an estimator.
      */
-    Estimator &_estimator;
+    OperationsEstimator::SharedPtr _estimator;
 
     /**
      * @brief _operationTimes
@@ -93,7 +106,7 @@ private:
      * @brief _logger
      * A pointer to an instance of a logger.
      */
-    std::shared_ptr<Logger> _logger;
+    std::shared_ptr<airmap::logging::Logger> _logger;
 
     /**
      * @brief _enabled

@@ -16,36 +16,39 @@ using airmap::stitcher::monitor::ElapsedTime;
 using airmap::stitcher::monitor::Estimator;
 using airmap::stitcher::monitor::Operation;
 using airmap::stitcher::monitor::OperationElapsedTimesMap;
+using airmap::stitcher::monitor::OperationsEstimator;
 
 class EstimatorTest : public ::testing::Test {
 protected:
     EstimatorTest()
-        : cameraAnafi(CameraModels::ParrotAnafiThermal())
-        , cameraVesper(CameraModels::VantageVesperEONavigation())
+        : cameraAnafi(
+              std::make_shared<Camera>(CameraModels::ParrotAnafiThermal()))
+        , cameraVesper(std::make_shared<Camera>(
+              CameraModels::VantageVesperEONavigation()))
         , logger(std::make_shared<stdoe_logger>())
     {
     }
 
     const OperationElapsedTimesMap anafiOperationEstimates()
     {
-        Estimator estimator = estimatorAnafi();
+        OperationsEstimator estimator = estimatorAnafi();
         estimator.enable();
         return estimator.estimateOperations();
     }
 
     const OperationElapsedTimesMap vesperOperationEstimates()
     {
-        Estimator estimator = estimatorVesper();
+        OperationsEstimator estimator = estimatorVesper();
         estimator.enable();
         return estimator.estimateOperations();
     }
 
-    Estimator estimatorAnafi(Estimator::UpdatedCb updatedCb = []() {})
+    OperationsEstimator estimatorAnafi(Estimator::UpdatedCb updatedCb = []() {})
     {
         return {cameraAnafi, logger, updatedCb};
     }
 
-    Estimator estimatorVesper(Estimator::UpdatedCb updatedCb = []() {})
+    OperationsEstimator estimatorVesper(Estimator::UpdatedCb updatedCb = []() {})
     {
         return {cameraVesper, logger, updatedCb};
     }
@@ -75,14 +78,14 @@ protected:
         return operationTimes;
     }
 
-    Camera cameraAnafi;
-    Camera cameraVesper;
-    std::shared_ptr<Logger> logger;
+    std::shared_ptr<Camera> cameraAnafi;
+    std::shared_ptr<Camera> cameraVesper;
+    std::shared_ptr<airmap::logging::Logger> logger;
 };
 
 TEST_F(EstimatorTest, changeOperations)
 {
-    Estimator estimator = estimatorAnafi();
+    OperationsEstimator estimator = estimatorAnafi();
     estimator.enable();
 
     const OperationElapsedTimesMap operationEstimates =
@@ -98,7 +101,7 @@ TEST_F(EstimatorTest, changeOperations)
 
 TEST_F(EstimatorTest, changeOperationsWithCb)
 {
-    Estimator estimator = estimatorAnafi();
+    OperationsEstimator estimator = estimatorAnafi();
     estimator.enable();
 
     const OperationElapsedTimesMap operationEstimates =
@@ -119,7 +122,7 @@ TEST_F(EstimatorTest, changeOperationsWithCb)
 
 TEST_F(EstimatorTest, changesOperationsAdjusted)
 {
-    Estimator estimator = estimatorAnafi();
+    OperationsEstimator estimator = estimatorAnafi();
     estimator.enable();
 
     const OperationElapsedTimesMap operationEstimates =
@@ -216,7 +219,7 @@ TEST_F(EstimatorTest, changesOperationsAdjusted)
 
 TEST_F(EstimatorTest, estimatedTimeRemaining)
 {
-    Estimator estimator = estimatorAnafi();
+    OperationsEstimator estimator = estimatorAnafi();
     estimator.enable();
 
     const OperationElapsedTimesMap operationEstimates =
@@ -248,7 +251,7 @@ TEST_F(EstimatorTest, estimatedTimeRemaining)
 
 TEST_F(EstimatorTest, operationProgress)
 {
-    Estimator estimator = estimatorVesper();
+    OperationsEstimator estimator = estimatorVesper();
     estimator.enable();
 
     estimator.changeOperation(Operation::Start());
@@ -276,7 +279,7 @@ TEST_F(EstimatorTest, operationProgress)
 
 TEST_F(EstimatorTest, currentProgress)
 {
-    Estimator estimator = estimatorVesper();
+    OperationsEstimator estimator = estimatorVesper();
     estimator.enable();
 
     const OperationElapsedTimesMap operationEstimates =
@@ -317,7 +320,7 @@ TEST_F(EstimatorTest, currentProgress)
 
 TEST_F(EstimatorTest, disable)
 {
-    Estimator estimator = estimatorAnafi();
+    OperationsEstimator estimator = estimatorAnafi();
     estimator.enable();
 
     estimator.changeOperation(Operation::Start());
@@ -336,7 +339,7 @@ TEST_F(EstimatorTest, disable)
 
 TEST_F(EstimatorTest, setCurrentEstimate)
 {
-    Estimator estimator = estimatorVesper();
+    OperationsEstimator estimator = estimatorVesper();
     estimator.enable();
 
     for (int i = 50; i >= 0; i--) {
@@ -348,7 +351,7 @@ TEST_F(EstimatorTest, setCurrentEstimate)
 
 TEST_F(EstimatorTest, setCurrentProgress)
 {
-    Estimator estimator = estimatorVesper();
+    OperationsEstimator estimator = estimatorVesper();
     estimator.enable();
 
     for (int i = 50; i >= 0; i--) {
@@ -361,7 +364,7 @@ TEST_F(EstimatorTest, setCurrentProgress)
 TEST_F(EstimatorTest, updatedCallback)
 {
     int calledCount = 0;
-    Estimator estimator = estimatorVesper([&calledCount]() { calledCount++; });
+    OperationsEstimator estimator = estimatorVesper([&calledCount]() { calledCount++; });
     estimator.enable();
 
     estimator.changeOperation(Operation::Start());

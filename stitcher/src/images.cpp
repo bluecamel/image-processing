@@ -1,10 +1,17 @@
-#include "airmap/images.h" 
+#include "airmap/images.h"
+
+#include <boost/format.hpp>
+
+#include <opencv2/core/utility.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/opencv_modules.hpp>
+#include <opencv2/stitching.hpp>
 
 namespace airmap {
 namespace stitcher {
 
 SourceImages::SourceImages(const Panorama &panorama,
-                           std::shared_ptr<Logger> logger,
+                           std::shared_ptr<airmap::logging::Logger> logger,
                            const int _minimumImageCount)
     : panorama(panorama)
     , images()

@@ -1,8 +1,8 @@
-#include "gtest/gtest.h"
 #include "airmap/images.h"
 #include "airmap/logging.h"
 #include "airmap/panorama.h"
 #include "opencv_assert/mat_compare.h"
+#include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
@@ -66,7 +66,7 @@ protected:
         source_images = std::make_shared<SourceImages>(std::move(panorama), logger);
     }
 
-    std::shared_ptr<Logger> logger;
+    std::shared_ptr<airmap::logging::Logger> logger;
     std::shared_ptr<SourceImages> source_images;
 };
 

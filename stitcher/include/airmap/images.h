@@ -1,19 +1,15 @@
 #pragma once
 
-#include <boost/format.hpp>
-
-#include <opencv2/core/utility.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/opencv_modules.hpp>
-#include <opencv2/stitching.hpp>
-
 #include "airmap/gimbal.h"
 #include "airmap/logging.h"
+#include "airmap/opencv/forward.h"
 #include "airmap/panorama.h"
 
 #include <random>
 
 using Logger = airmap::logging::Logger;
+using airmap::stitcher::opencv::defaultInterpolationFlags;
+using airmap::stitcher::opencv::InterpolationFlags;
 
 namespace airmap {
 namespace stitcher {
@@ -51,7 +47,7 @@ struct SourceImages
     /**
      * @brief logger
      */
-    std::shared_ptr<Logger> _logger;
+    std::shared_ptr<airmap::logging::Logger> _logger;
 
     /**
      * @brief minimumImageCount
@@ -63,7 +59,8 @@ struct SourceImages
      * @brief SourceImages
      * @param panorama Source image paths and metadata.
      */
-    SourceImages(const Panorama &panorama, std::shared_ptr<Logger> logger,
+    SourceImages(const Panorama &panorama,
+                 std::shared_ptr<airmap::logging::Logger> logger,
                  const int _minimumImageCount = 2);
 
     /**
@@ -111,7 +108,7 @@ struct SourceImages
      * @param scale
      * @param interpolation
      */
-    void scale(double scale, int interpolation = cv::INTER_LINEAR_EXACT);
+    void scale(double scale, int interpolation = defaultInterpolationFlags());
 
     /**
      * @brief scaleToAvailableMemory
@@ -125,9 +122,10 @@ struct SourceImages
      * @param interpolation OpenCV resize interpolation method.
      * @throws std::invalid_argument When RAM budget is too small.
      */
-    void scaleToAvailableMemory(size_t memoryBudgetMB, size_t &maxInputImageSize,
-                                size_t &inputSizeMB, double &inputScaled,
-                                int interpolation = cv::INTER_LINEAR_EXACT);
+    void
+    scaleToAvailableMemory(size_t memoryBudgetMB, size_t &maxInputImageSize,
+                           size_t &inputSizeMB, double &inputScaled,
+                           int interpolation = defaultInterpolationFlags());
 };
 
 } // namespace stitcher
