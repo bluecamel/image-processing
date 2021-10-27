@@ -1,0 +1,8 @@
+6,8c6,8
+< DEFINCS = -I/usr/include -I/usr/local/include -I/usr/local/include/opencv4
+< DEFLIBS = -L/usr/lib -L/usr/local/lib
+< LINKLIBS = -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_imgcodecs -lopencv_videoio -lopencv_calib3d
+---
+> DEFINCS = -I/usr/include -I/usr/include/opencv2
+> DEFLIBS = -L/usr/lib 
+> LINKLIBS = -lopencv_core -lopencv_highgui -lopencv_imgproc 

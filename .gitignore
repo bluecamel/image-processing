@@ -47,3 +47,9 @@ dist
 **/*.vscode
 **/bats
 **/build*
+
+# calibration
+stitcher/calibration/ocam_calib/autoCornerFinder_linux
+stitcher/calibration/ocam_calib/autoCornerFinder_linux.zip
+stitcher/calibration/ocam_calib/Scaramuzza_OCamCalib_v3.0_win
+stitcher/calibration/ocam_calib/Scaramuzza_OCamCalib_v3.0_win.zip

@@ -1,0 +1,51 @@
+34,39c34
+< #include <opencv4/opencv2/core.hpp>
+< #include <opencv4/opencv2/core/core_c.h>
+< #include <opencv4/opencv2/videoio.hpp>
+< #include <opencv4/opencv2/videoio/videoio_c.h>
+< #include <opencv4/opencv2/highgui.hpp>
+< #include <opencv4/opencv2/highgui/highgui_c.h>
+---
+> #include <opencv.hpp>
+44d38
+< #include <iostream>
+50a45,49
+> /*
+> static int cvFindChessboardCorners3( const void* arr, CvSize pattern_size,
+>                              CvPoint2D32f* out_corners, int* out_corner_count,
+>                              int min_number_of_corners );
+> */	
+60d58
+< 	int nurr = 0;
+78d75
+< 
+114c111
+< 		else if( s[0] != '-' ) {
+---
+> 		else if( s[0] != '-' )
+116d112
+<         }
+158a155
+> 
+163,164d159
+< 		cv::Mat view_mat;
+< 		IplImage view_;
+181,184c176
+< 				view_mat = cv::imread(imagename);
+< 				view_ = cvIplImage(view_mat);
+< 				view = &view_;
+< 
+---
+> 				view = cvLoadImage( imagename, 1 );
+211d202
+< 
+242,245d232
+< 		if (found) {
+< 			std::cout << "found points" << std::endl;
+< 		}
+< 
+248,249c235
+< 		view_mat.release();
+< 		view = nullptr;
+---
+> 		cvReleaseImage( &view );
